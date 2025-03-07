@@ -1,102 +1,88 @@
 import type React from "react";
-import { useState, useEffect, useRef } from "react"
-
+import { useState, useEffect, useRef } from "react";
 
 const Quiz: React.FC = () => {
-
-    interface IQuestion{
+    interface IQuestion {
         city?: string;
         country?: string;
         fun_fact?: string[];
         clues?: string[];
         possible_destinations?: string[];
     }
+
     const [questions, setQuestions] = useState<IQuestion[]>([]);
     const [page, setPage] = useState(1);
-    let [maxPageNumber, setMaxPageNumber] = useState<number>(0);
+    const [maxPageNumber, setMaxPageNumber] = useState<number>(0);
     const observer = useRef<IntersectionObserver | null>(null);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    
     const url: string = `${import.meta.env.VITE_BACKEND_URL}/quiz/getQuestion?page=${page}`;
+
     const fetchData = async (url: string) => {
         try {
             setError(null);
             setLoading(true);
-            return await fetch(url)
-            .then(res => res.json())
-
-        } catch (e: any){
+            const response = await fetch(url);
+            return await response.json();
+        } catch (e: any) {
             setError(e.message);
-
-
         } finally {
             setLoading(false);
-
         }
-    } 
-
+    };
 
     useEffect(() => {
-        
         fetchData(url).then((data) => {
-            setQuestions(data.cities as IQuestion[])
+            setQuestions(data.cities as IQuestion[]);
             setMaxPageNumber(data.maxPageNumber);
-
         });
-    }, [])
+    }, []);
 
-    const loadMoreQuestions = async() => {
-        console.log(maxPageNumber, "MAX PAGE NUMBER AFTER ASSIGNMENT")
+    const loadMoreQuestions = async () => {
+        if (page >= maxPageNumber) return;
 
-        if(page > maxPageNumber){
-            return;
-        } else {
         setPage((prev) => prev + 1);
         await fetchData(url).then((data) => {
-            console.log(data.cities, data.maxPageNumber);
-            setQuestions((prev) => [...prev, ...data.cities as IQuestion[]])});    
-        }
-    }
+            setQuestions((prev) => [...prev, ...(data.cities as IQuestion[])]);
+        });
+    };
 
     const lastElementRef = (node: HTMLDivElement) => {
-        if(loading) return;
-        if(observer.current) observer.current.disconnect();
+        if (loading) return;
+        if (observer.current) observer.current.disconnect();
 
-        observer.current = new IntersectionObserver((entries) => {
-            if(entries[0].isIntersecting){
-                loadMoreQuestions();
-            }
-        })
+        observer.current = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    loadMoreQuestions();
+                }
+            },
+            { root: scrollContainerRef.current, threshold: 1.0 }
+        );
 
-        if(node) observer.current.observe(node);
-    }
+        if (node) observer.current.observe(node);
+    };
 
-   
-
-    return(
-        <>
-            <div>
-                {questions.map((question, index) => (
-                    <div key={index} ref={index === questions.length - 1 ? lastElementRef : null}>
-                        <p>{question.city}</p>
-                        <p>{question.country}</p>
-                        <p>{question.fun_fact}</p>
-                        <p>{question.clues}</p>
-                        <p>{question.possible_destinations}</p>
-                    </div>
-                ))}
-            </div>
-            {/* {page > maxPageNumber ? (
-                <p>No more questions available!</p>
-            ) : (
-                <button onClick={loadMoreQuestions} > Load More
-                </button>
-            )} */}
-
-        </>
-    )
-} 
+    return (
+        <div
+            ref={scrollContainerRef}
+            className="h-[700px] overflow-y-auto border border-gray-300 p-4"
+        >
+            {questions.map((question, index) => (
+                <div key={index} ref={index === questions.length - 1 ? lastElementRef : null} className="p-2 border-b">
+                    <p>City: {question.city}</p>
+                    <p>Country: {question.country}</p>
+                    <p>Fun Fact: {question.fun_fact?.join(", ")}</p>
+                    <p>Clues: {question.clues?.join(", ")}</p>
+                    <p>Possible Destinations: {question.possible_destinations?.join(", ")}</p>
+                </div>
+            ))}
+            {loading && <p className="text-center mt-2">Loading...</p>}
+            {error && <p className="text-red-500">{error}</p>}
+        </div>
+    );
+};
 
 export default Quiz;
